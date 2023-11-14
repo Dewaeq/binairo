@@ -1,2 +1,2 @@
-# Rust Sudoku Solver
-Solve sudokus in Rust using the backtracking algorithm
+# Rust Binairo Solver
+Solve binairos in Rust using the backtracking algorithm
