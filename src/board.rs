@@ -1,48 +1,66 @@
-pub const OPEN: u8 = 0;
-pub const DIM: usize = 12;
-pub const SIZE: usize = DIM * DIM;
+pub const OPEN: u8 = 255;
 
-pub type Field = [u8; SIZE];
-
+#[derive(Debug)]
 pub struct Board {
     /// Square 0 is the left upper square, `squares[0]`
-    pub squares: Field,
+    pub squares: Vec<u8>,
+    pub dim: usize,
+    pub size: usize,
+    pub options: Vec<char>,
+    max_items: u8,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Square;
 impl Board {
-    pub fn new(squares: Field) -> Option<Board> {
-        if !(Board { squares }).valid_board() {
+    pub fn new(squares: &str) -> Option<Board> {
+        let list: Vec<char> = squares.replace("-", "").replace("\n", "").chars().collect();
+        let size = list.len();
+        let dim = f32::sqrt(size as f32).round() as usize;
+        let options = extract_options(&list);
+        let num_options = options.len();
+
+        let mut squares = vec![OPEN; size];
+
+        for i in 0..size {
+            let value = list.get(i).unwrap();
+            let key = if char::is_whitespace(*value) {
+                OPEN
+            } else {
+                options.iter().position(|x| x == value).unwrap() as u8
+            };
+
+            squares[i] = key;
+        }
+
+        let mut board = Board {
+            squares,
+            dim,
+            size,
+            options,
+            max_items: (dim / num_options) as u8,
+        };
+
+        if !board.valid_board() {
             return None;
         }
-        Some(Board { squares })
-    }
 
-    pub fn from_input(input: &str) -> Option<Board> {
-        let list: Vec<&str> = input.split("").collect();
-        assert!(list.len() == DIM, "Please provide a full length string");
-
-        let mut data: Field = [OPEN; SIZE];
-        for i in 0..SIZE {
-            let value = list.get(i).unwrap();
-
-            data[i] = value
-                .parse::<u8>()
-                .expect(&format!("Failed to parse {} to u8", value));
-        }
-        Board::new(data)
+        Some(board)
     }
 
     fn valid_board(&mut self) -> bool {
         let mut succes = true;
-        for i in 0..SIZE {
+
+        if self.size != self.dim * self.dim {
+            println!("Please submit a board with a valid size");
+            succes = false;
+        }
+
+        for i in 0..self.size {
             let value = self.get_square_value(i);
             if value == OPEN {
                 continue;
             }
             if !self.valid_square_value(i, value) {
-                let (x, y) = Square::get_coord(i);
+                let (x, y) = get_coord(i, self.dim);
                 println!("Illegal value {} at x:{} y:{}", value, x + 1, y + 1);
                 succes = false;
             }
@@ -55,16 +73,18 @@ impl Board {
     }
 
     pub fn get_row(&self, y: usize) -> &[u8] {
-        let start = y as usize * DIM;
-        let stop = start + DIM;
+        let start = y as usize * self.dim;
+        let stop = start + self.dim;
+
         &self.squares[start..stop]
     }
 
-    fn get_column(&self, x: usize) -> [u8; DIM] {
-        let mut output: [u8; DIM] = [0; DIM];
-        for i in 0..DIM {
-            output[i] = self.squares[x + i * DIM]
+    fn get_column<'a>(&self, x: usize) -> Vec<u8> {
+        let mut output = vec![OPEN; self.dim];
+        for i in 0..self.dim {
+            output[i] = self.squares[x + i * self.dim]
         }
+
         output
     }
 
@@ -76,39 +96,37 @@ impl Board {
         let old_value = self.get_square_value(index);
         self.set_square_value(index, value);
 
-        let (x, y) = Square::get_coord(index);
-        let fits_row = self.square_fits_in_row(x, y, value);
-        let fits_column = self.value_fits_in_column(x, y, value);
-
+        let (x, y) = get_coord(index, self.dim);
         let row = self.get_row(y);
         let col = self.get_column(x);
         let fits_count = self.fits_count(&row, value) && self.fits_count(&col, value);
+        let fits_row = self.fits_line(&row, x, value);
+        let fits_column = self.fits_line(&col, y, value);
 
         self.set_square_value(index, old_value);
 
         fits_row && fits_column && fits_count
     }
 
-    fn square_fits_in_row(&self, x: usize, y: usize, value: u8) -> bool {
+    fn fits_line(&self, line: &[u8], pos: usize, value: u8) -> bool {
         let mut count = 0;
-        let row = self.get_row(y);
 
-        let mut i = x + 1;
-        while i < row.len() {
-            if row[i] != value {
+        let mut i = pos + 1;
+        while i < line.len() {
+            if line[i] != value {
                 break;
             }
-            count += (row[i] == value) as usize;
+            count += (line[i] == value) as usize;
             i += 1;
         }
 
-        if x > 0 {
-            i = x - 1;
+        if pos > 0 {
+            i = pos - 1;
             loop {
-                if row[i] != value {
+                if line[i] != value {
                     break;
                 }
-                count += (row[i] == value) as usize;
+                count += (line[i] == value) as usize;
                 if i == 0 {
                     break;
                 }
@@ -119,52 +137,21 @@ impl Board {
         count < 2
     }
 
-    fn value_fits_in_column(&self, x: usize, y: usize, value: u8) -> bool {
-        let mut count = 0;
-        let col = self.get_column(x);
-
-        let mut i = y + 1;
-        while i < col.len() {
-            if col[i] != value {
-                break;
-            }
-            count += (col[i] == value) as usize;
-            i += 1;
-        }
-
-        if y > 0 {
-            i = y - 1;
-            loop {
-                if col[i] != value {
-                    break;
-                }
-                count += (col[i] == value) as usize;
-                if i == 0 {
-                    break;
-                }
-                i -= 1;
-            }
-        }
-
-        count < 2
-    }
-
-    pub fn fits_count(&self, line: &[u8], value: u8) -> bool {
-        value == OPEN || line.iter().filter(|&x| *x == value).count() <= 4
+    fn fits_count(&self, line: &[u8], value: u8) -> bool {
+        value == OPEN || line.iter().filter(|&x| *x == value).count() <= self.max_items as usize
     }
 
     pub fn print_board(&self) {
-        for i in 0..SIZE {
-            let x = Square::get_coord(i).0;
+        for i in 0..self.size {
+            let x = get_coord(i, self.dim).0;
             let value = self.get_square_value(i);
-            let s = match value {
-                1 => "O",
-                2 => "I",
-                3 => "X",
-                _ => ".",
+            let s = if value == OPEN {
+                ".".to_owned()
+            } else {
+                self.options[value as usize].to_string()
             };
 
-            if x == DIM - 1 {
+            if x == self.dim - 1 {
                 println!(" {} ", s);
             } else {
                 print!(" {} ", s);
@@ -173,10 +160,20 @@ impl Board {
     }
 }
 
-impl Square {
-    fn get_coord(square: usize) -> (usize, usize) {
-        let y = square / DIM;
-        let x = square % DIM;
-        (x, y)
+fn get_coord(square: usize, dim: usize) -> (usize, usize) {
+    let y = square / dim;
+    let x = square % dim;
+    (x, y)
+}
+
+fn extract_options(squares: &Vec<char>) -> Vec<char> {
+    let mut options = vec![];
+
+    for &c in squares {
+        if !char::is_whitespace(c) && !options.contains(&c) {
+            options.push(c);
+        }
     }
+
+    options
 }

@@ -1,4 +1,4 @@
-use crate::board::{Board, OPEN, SIZE};
+use crate::board::{Board, OPEN};
 
 pub struct Search<'a> {
     board: &'a mut Board,
@@ -10,7 +10,7 @@ impl Search<'_> {
     }
 
     fn get_empty_square(&self, square: usize) -> usize {
-        for i in square..SIZE {
+        for i in square..self.board.size {
             if self.board.get_square_value(i) == OPEN {
                 return i;
             }
@@ -25,9 +25,9 @@ impl Search<'_> {
             return true;
         }
 
-        for i in 1..4 {
-            if self.board.valid_square_value(square, i) {
-                self.board.set_square_value(square, i);
+        for i in 0..self.board.options.len() {
+            if self.board.valid_square_value(square, i as u8) {
+                self.board.set_square_value(square, i as u8);
                 if self.search_board(square) {
                     return true;
                 }
