@@ -22,7 +22,7 @@ impl Board {
 
         for i in 0..size {
             let value = list.get(i).unwrap();
-            let key = if char::is_whitespace(*value) {
+            let key = if char::is_whitespace(*value) || *value == '.' {
                 OPEN
             } else {
                 options.iter().position(|x| x == value).unwrap() as u8
@@ -61,7 +61,12 @@ impl Board {
             }
             if !self.valid_square_value(i, value) {
                 let (x, y) = get_coord(i, self.dim);
-                println!("Illegal value {} at x:{} y:{}", value, x + 1, y + 1);
+                println!(
+                    "Illegal value {} at x:{} y:{}",
+                    self.options[value as usize],
+                    x + 1,
+                    y + 1
+                );
                 succes = false;
             }
         }
@@ -170,7 +175,7 @@ fn extract_options(squares: &Vec<char>) -> Vec<char> {
     let mut options = vec![];
 
     for &c in squares {
-        if !char::is_whitespace(c) && !options.contains(&c) {
+        if !char::is_whitespace(c) && c != '.' && !options.contains(&c) {
             options.push(c);
         }
     }
